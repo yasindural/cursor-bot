@@ -25,9 +25,19 @@ USERS_FILE = BASE_DIR / "users.json"
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
 
+# CORS: local dev + Render backend + GitHub Pages frontend
 CORS(
     app,
-    resources={r"/api/*": {"origins": ["http://localhost:5173", "https://cursor-futures-bot-panel.onrender.com"]}},
+    resources={
+        r"/api/*": {
+            "origins": [
+                "http://localhost:5173",                         # lokal Vite
+                "https://cursor-futures-bot-panel.onrender.com", # Render backend (self-origin)
+                "https://futures-bot-dashboard-202.created.app", # eski Emergent frontend (istersen)
+                "https://yasindural.github.io",                  # GitHub Pages frontend
+            ]
+        }
+    },
     supports_credentials=True,
 )
 
