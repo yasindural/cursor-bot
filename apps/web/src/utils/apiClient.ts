@@ -26,11 +26,23 @@ class ApiClient {
         } catch {
           // ignore
         }
+
+        // Sadece session kontrolü için 401'leri sessizce yut
+        if (endpoint === "/api/auth/me" && response.status === 401) {
+          console.warn("Session check: not logged in (401).");
+          return null;
+        }
+
         throw new Error(errorMessage);
       }
 
       return await response.json();
     } catch (error) {
+      // auth/me için ekstra loglama yapma, yukarıda handled
+      if (endpoint === "/api/auth/me") {
+        return null;
+      }
+
       console.error(`API Error [${endpoint}]:`, error);
       throw error;
     }

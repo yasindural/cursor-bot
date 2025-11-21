@@ -1,0 +1,55 @@
+name: Smoke Test
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch: {}
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+
+    env:
+      SMOKE_TEST_URL: ${{ secrets.SMOKE_TEST_URL }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies if apps/package.json exists
+        run: |
+          if [ -f "apps/package.json" ]; then
+            cd apps
+            if [ -f package-lock.json ]; then
+              npm ci
+            else
+              npm install
+            fi
+          else
+            echo "No /apps/package.json found, skipping npm install."
+          fi
+
+      - name: Run smoke tests via shell script
+        run: |
+          cd apps
+          chmod +x ./run-smoke-test.sh || true
+          if [ -f "smokeRunner.js" ]; then
+            ./run-smoke-test.sh
+          else
+            echo "smokeRunner.js not found in /apps, skipping smoke test."
+            exit 1
+          fi
+
+      - name: Note on failure
+        if: failure()
+        run: |
+          echo "Smoke test failed. Please check the logs above for details."
+

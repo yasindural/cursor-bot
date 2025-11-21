@@ -1,4 +1,4 @@
-export default function Header({ user, onLogout }) {
+export default function Header({ user, onLogout, botStatus }) {
   const handleLogout = async () => {
     try {
       await onLogout();
@@ -12,6 +12,16 @@ export default function Header({ user, onLogout }) {
       <h1 className="text-xl font-semibold text-white">Futures Bot Dashboard</h1>
 
       <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 text-sm">
+          <span
+            className={`inline-block w-2 h-2 rounded-full ${
+              botStatus?.health === "running" ? "bg-green-400" : "bg-yellow-400"
+            }`}
+          />
+          <span className="text-[#8A93A6]">
+            {botStatus?.health === "running" ? "Bağlı" : "Bağlantı kontrol ediliyor..."}
+          </span>
+        </div>
         <span className="text-sm text-[#8A93A6]">
           Hoş geldin, {user?.username || "Kullanıcı"}
         </span>

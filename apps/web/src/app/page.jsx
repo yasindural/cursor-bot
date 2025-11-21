@@ -94,7 +94,7 @@ function LoginPage({ onLogin, loading }) {
 function Dashboard({ user, dashboardData, positions, onLogout, onClosePosition, loading }) {
   return (
     <div className="min-h-screen bg-[#1F2634] text-white font-inter">
-      <Header user={user} onLogout={onLogout} />
+      <Header user={user} onLogout={onLogout} botStatus={dashboardData?.status} />
 
       <main className="p-6 space-y-6">
         <StatsCards dashboardData={dashboardData} />
@@ -123,26 +123,28 @@ export default function HomePage() {
         apiClient.getOpenPositions().catch(() => null),
       ]);
 
-      setDashboardData({
-        status: statusRes
-          ? {
-              running: true,
-              version: statusRes.bot_version,
-            }
-          : { running: false, version: "N/A" },
-        pnl: pnlRes
-          ? {
-              daily: pnlRes.daily_realized_pnl,
-              total: pnlRes.total_realized_pnl,
-              roi: pnlRes.overall_roi,
-            }
-          : { daily: 0, total: 0, roi: 0 },
-      });
+      if (statusRes) {
+        setDashboardData((prev) => ({
+          ...prev,
+          status: statusRes,
+        }));
+      }
 
-      const list = positionsRes?.positions || [];
-      setPositions(list);
+      if (pnlRes) {
+        setDashboardData((prev) => ({
+          ...(prev || {}),
+          pnl: pnlRes,
+        }));
+      }
+
+      if (positionsRes) {
+        setPositions(positionsRes.positions || []);
+      }
     } catch (error) {
-      console.error("Dashboard load error:", error);
+      // Burada artık global alert / ses vs. ÇALDIRMA
+      console.warn("Dashboard yüklenirken geçici hata:", error);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
