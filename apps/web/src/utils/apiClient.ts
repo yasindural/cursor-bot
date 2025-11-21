@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:5000";
+const BASE_URL = "https://cursor-futures-bot-panel.onrender.com";
 
 class ApiClient {
   private async request(endpoint: string, options: RequestInit = {}): Promise<any> {
