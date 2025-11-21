@@ -1,10 +1,7 @@
-[
+﻿[
   {
     "username": "admin",
-    "password_hash": "scrypt:32768:8:1$qsFgRWJVZSZaJ4Nd$7dcec1d8debe21fa43e48c72901029552f2bb5100f63eaa6820d780f5e638ae6ed47d14dfba02e9e2b2efa4b17788c43e4d450e3d5de22cd40f1d3354fab9fbd",
-    "role": "admin",
-    "api_key": "",
-    "api_secret": "",
-    "theme_preference": "dark"
+    "password": "YeniSifre123",
+    "role": "admin"
   }
 ]

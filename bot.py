@@ -8,8 +8,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, session
 from flask_cors import CORS
+
+# -------------------------------------------------------------------
+# Temel ayarlar & yollar
+# -------------------------------------------------------------------
 
 BOT_VERSION = "PNL_TRAIL_V2"
 BASE_DIR = Path(__file__).parent
@@ -19,6 +23,8 @@ CONFIG_FILE = BASE_DIR / "bot_config.json"
 USERS_FILE = BASE_DIR / "users.json"
 
 app = Flask(__name__)
+app.secret_key = os.getenv("FLASK_SECRET_KEY", "dev-secret-key")
+
 CORS(
     app,
     resources={r"/api/*": {"origins": ["http://localhost:5173", "https://cursor-futures-bot-panel.onrender.com"]}},
@@ -35,6 +41,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+# -------------------------------------------------------------------
+# Yardımcı fonksiyonlar
+# -------------------------------------------------------------------
 
 def _load_json(path: Path, default: Any) -> Any:
     if path.exists():
@@ -66,11 +76,48 @@ def load_users() -> List[Dict[str, Any]]:
     default = [
         {
             "username": "admin",
+            "password": "YeniSifre123",
             "role": "admin",
         }
     ]
     return _load_json(USERS_FILE, default)
 
+
+# -------------------------------------------------------------------
+# Auth endpointleri
+# -------------------------------------------------------------------
+
+@app.route("/api/auth/login", methods=["POST"])
+def api_auth_login() -> Any:
+    data = request.get_json(silent=True) or {}
+    username = data.get("username")
+    password = data.get("password")
+
+    users = load_users()
+    for u in users:
+        if u.get("username") == username and u.get("password") == password:
+            session["user"] = {"username": username, "role": u.get("role", "admin")}
+            return jsonify({"status": "ok", "user": session["user"]})
+    return jsonify({"status": "error", "message": "Invalid credentials"}), 401
+
+
+@app.route("/api/auth/me", methods=["GET"])
+def api_auth_me() -> Any:
+    user = session.get("user")
+    if not user:
+        return jsonify({"status": "error", "message": "Not logged in"}), 401
+    return jsonify({"status": "ok", "user": user})
+
+
+@app.route("/api/auth/logout", methods=["POST"])
+def api_auth_logout() -> Any:
+    session.pop("user", None)
+    return jsonify({"status": "ok", "message": "Logged out"})
+
+
+# -------------------------------------------------------------------
+# Basit API endpointleri
+# -------------------------------------------------------------------
 
 @app.route("/api/status", methods=["GET"])
 def api_status() -> Any:
@@ -109,6 +156,10 @@ def api_logs() -> Any:
 def api_health() -> Any:
     return jsonify({"status": "ok", "health": "running", "bot_version": BOT_VERSION})
 
+
+# -------------------------------------------------------------------
+# Smoke test logic
+# -------------------------------------------------------------------
 
 def _run_smoke_suite() -> Tuple[Dict[str, Any], List[Dict[str, Any]], Dict[str, Any]]:
     tests: Dict[str, Any] = {}
@@ -177,6 +228,10 @@ def api_smoke_test() -> Any:
     status_code = 200 if summary["failed"] == 0 else 503
     return jsonify(payload), status_code
 
+
+# -------------------------------------------------------------------
+# Entry point
+# -------------------------------------------------------------------
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
