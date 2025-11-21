@@ -1,479 +1,223 @@
-"use client";
+import React, { useEffect, useState } from "react";
+import apiClient from "@/utils/apiClient";
+import Header from "@/components/Header";
+import StatsCards from "@/components/StatsCards";
+import PositionsTable from "@/components/PositionsTable";
+import Loader from "@/components/Loader";
 
-import { useEffect, useState, useCallback } from "react";
-import {
-  getStatus,
-  getOpenPositions,
-  getPnlSummary,
-  getApiBaseUrl,
-  login,
-  logout,
-  getCurrentUser,
-} from "../utils/apiClient";
-
-const numberFormatter = new Intl.NumberFormat("tr-TR", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-export default function DashboardPage() {
-  const [user, setUser] = useState(null);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [authError, setAuthError] = useState("");
-  const [loginForm, setLoginForm] = useState({ username: "", password: "" });
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [status, setStatus] = useState(null);
-  const [pnlSummary, setPnlSummary] = useState(null);
-  const [positions, setPositions] = useState([]);
-  const [loading, setLoading] = useState(true);
+function LoginPage({ onLogin, loading }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true);
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError("");
+
+    try {
+      await onLogin({ username, password });
+    } catch (err) {
+      setError(err.message || "Giriş başarısız");
+    }
+  };
+
+  const handleDemoClick = () => {
+    setUsername("admin");
+    setPassword("YeniSifre123");
+  };
+
+  return (
+    <div className="min-h-screen bg-[#0B1120] flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-[#111827] border border-[#1F2937] rounded-2xl p-8 shadow-xl">
+        <h1 className="text-2xl font-semibold text-white mb-2">Futures Bot Dashboard</h1>
+        <p className="text-sm text-[#9CA3AF] mb-6">
+          Lütfen panele giriş yapmak için kullanıcı bilgilerinizi girin.
+        </p>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/40 rounded-lg px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-sm font-medium text-[#E5E7EB] mb-1.5">
+              Kullanıcı Adı
+            </label>
+            <input
+              type="text"
+              className="w-full bg-[#020617] border border-[#1F2937] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#F2C64B] focus:border-transparent"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="admin"
+              autoComplete="username"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-[#E5E7EB] mb-1.5">
+              Şifre
+            </label>
+            <input
+              type="password"
+              className="w-full bg-[#020617] border border-[#1F2937] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#F2C64B] focus:border-transparent"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              autoComplete="current-password"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#F2C64B] text-black font-medium py-2 px-4 rounded-lg hover:bg-[#F2C64B]/90 focus:outline-none focus:ring-2 focus:ring-[#F2C64B] focus:ring-offset-2 focus:ring-offset-[#111827] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Giriş yapılıyor..." : "Giriş Yap"}
+          </button>
+        </form>
+
+        <div className="text-center mt-4">
+          <button
+            onClick={handleDemoClick}
+            className="text-[#9CA3AF] text-xs hover:text-[#F2C64B] transition-colors cursor-pointer"
+          >
+            Demo: admin / YeniSifre123 (Tıklayın)
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ user, dashboardData, positions, onLogout, onClosePosition, loading }) {
+  return (
+    <div className="min-h-screen bg-[#1F2634] text-white font-inter">
+      <Header user={user} onLogout={onLogout} />
+
+      <main className="p-6 space-y-6">
+        <StatsCards dashboardData={dashboardData} />
+        <PositionsTable
+          positions={positions}
+          onClosePosition={onClosePosition}
+          loading={loading}
+        />
+      </main>
+    </div>
+  );
+}
+
+export default function HomePage() {
+  const [user, setUser] = useState(null);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [positions, setPositions] = useState([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
+
+  const loadDashboard = async () => {
     try {
       const [statusRes, pnlRes, positionsRes] = await Promise.all([
-        getStatus(),
-        getPnlSummary(),
-        getOpenPositions(),
+        apiClient.getBotStatus().catch(() => null),
+        apiClient.getPnlSummary().catch(() => null),
+        apiClient.getOpenPositions().catch(() => null),
       ]);
-      setStatus(statusRes);
-      setPnlSummary(pnlRes);
-      setPositions(positionsRes.positions || []);
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "Bilinmeyen hata");
-    } finally {
-      setLoading(false);
+
+      setDashboardData({
+        status: statusRes
+          ? {
+              running: true,
+              version: statusRes.bot_version,
+            }
+          : { running: false, version: "N/A" },
+        pnl: pnlRes
+          ? {
+              daily: pnlRes.daily_realized_pnl,
+              total: pnlRes.total_realized_pnl,
+              roi: pnlRes.overall_roi,
+            }
+          : { daily: 0, total: 0, roi: 0 },
+      });
+
+      const list = positionsRes?.positions || [];
+      setPositions(list);
+    } catch (error) {
+      console.error("Dashboard load error:", error);
     }
-  }, []);
+  };
 
   useEffect(() => {
-    let ignore = false;
-    async function checkAuth() {
-      setAuthLoading(true);
-      setAuthError("");
+    const checkSession = async () => {
       try {
-        const data = await getCurrentUser();
-        if (!ignore) {
-          setUser(data.user);
+        const res = await apiClient.getCurrentUser();
+        if (res?.status === "ok") {
+          setUser(res.user);
+          await loadDashboard();
         }
       } catch {
-        if (!ignore) {
-          setUser(null);
-        }
+        // login yoksa sessiz geç
       } finally {
-        if (!ignore) {
-          setAuthLoading(false);
-        }
+        setInitialLoading(false);
       }
-    }
-    checkAuth();
-    return () => {
-      ignore = true;
     };
+
+    checkSession();
   }, []);
 
-  useEffect(() => {
-    if (!user) {
-      setStatus(null);
-      setPnlSummary(null);
-      setPositions([]);
-      setLoading(false);
-      return;
-    }
-
-    fetchDashboard();
-    const timer = setInterval(fetchDashboard, 10000);
-    return () => clearInterval(timer);
-  }, [user, fetchDashboard]);
-
-  const handleLogin = async (event) => {
-    event.preventDefault();
-    setLoginLoading(true);
-    setAuthError("");
+  const handleLogin = async ({ username, password }) => {
+    setActionLoading(true);
     try {
-      const loggedUser = await login(loginForm.username, loginForm.password);
-      setUser(loggedUser);
-      setLoginForm({ username: "", password: "" });
-    } catch (err) {
-      console.error(err);
-      setAuthError(err instanceof Error ? err.message : "Giriş başarısız");
+      const res = await apiClient.login({ username, password });
+      if (res?.status === "ok") {
+        setUser(res.user);
+        await loadDashboard();
+      } else {
+        throw new Error(res?.message || "Geçersiz yanıt");
+      }
     } finally {
-      setLoginLoading(false);
+      setActionLoading(false);
     }
   };
 
   const handleLogout = async () => {
+    setActionLoading(true);
     try {
-      await logout();
-    } catch (err) {
-      console.error(err);
-    } finally {
+      await apiClient.logout();
       setUser(null);
-      setStatus(null);
-      setPnlSummary(null);
+      setDashboardData(null);
       setPositions([]);
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  const isHealthy = status?.health === "ok";
+  const handleClosePosition = async (state_key) => {
+    setActionLoading(true);
+    try {
+      await apiClient.closePosition(state_key);
+      await loadDashboard();
+    } finally {
+      setActionLoading(false);
+    }
+  };
 
-  if (authLoading) {
-    return (
-      <main style={styles.container}>
-        <p>Oturum kontrol ediliyor...</p>
-      </main>
-    );
+  if (initialLoading) {
+    return <Loader message="Oturum kontrol ediliyor..." />;
   }
 
   if (!user) {
-    return (
-      <main style={styles.container}>
-        <section style={styles.authWrapper}>
-          <div style={styles.authCard}>
-            <h1 style={styles.authTitle}>Futures Bot Paneli</h1>
-            <p style={styles.subtitle}>
-              Backend API: <code>{getApiBaseUrl()}</code>
-            </p>
-            <form style={styles.authForm} onSubmit={handleLogin}>
-              <label style={styles.authLabel}>
-                Kullanıcı Adı
-                <input
-                  style={styles.authInput}
-                  type="text"
-                  value={loginForm.username}
-                  onChange={(e) =>
-                    setLoginForm((prev) => ({ ...prev, username: e.target.value }))
-                  }
-                  required
-                />
-              </label>
-              <label style={styles.authLabel}>
-                Şifre
-                <input
-                  style={styles.authInput}
-                  type="password"
-                  value={loginForm.password}
-                  onChange={(e) =>
-                    setLoginForm((prev) => ({ ...prev, password: e.target.value }))
-                  }
-                  required
-                />
-              </label>
-              {authError && <p style={styles.error}>{authError}</p>}
-              <button style={styles.primaryButton} type="submit" disabled={loginLoading}>
-                {loginLoading ? "Giriş yapılıyor..." : "Giriş Yap"}
-              </button>
-            </form>
-          </div>
-        </section>
-      </main>
-    );
+    return <LoginPage onLogin={handleLogin} loading={actionLoading} />;
   }
 
   return (
-    <main style={styles.container}>
-      <header style={styles.header}>
-        <div>
-          <h1 style={styles.title}>Futures Bot Dashboard</h1>
-          <p style={styles.subtitle}>
-            Backend API: <code>{getApiBaseUrl()}</code>
-          </p>
-        </div>
-        <div style={styles.userBox}>
-          <div>
-            <p style={styles.userName}>Hoş geldin, {user.username}</p>
-            <small style={styles.userRole}>Rol: {user.role}</small>
-          </div>
-          <button style={styles.refreshButton} onClick={fetchDashboard}>
-            Yenile
-          </button>
-          <button style={styles.logoutButton} onClick={handleLogout}>
-            Çıkış Yap
-          </button>
-        </div>
-      </header>
-
-      {loading && <p>Veriler yükleniyor...</p>}
-      {error && <p style={styles.error}>{error}</p>}
-
-      <section style={styles.grid}>
-        <div style={styles.card}>
-          <h3>Bot Durumu</h3>
-          <p>
-            <strong>Versiyon:</strong> {status?.bot_version || "-"}
-          </p>
-          <p>
-            <strong>Health:</strong>{" "}
-            <span style={isHealthy ? styles.badgeSuccess : styles.badgeDanger}>
-              {status?.health || "bilinmiyor"}
-            </span>
-          </p>
-        </div>
-
-        <div style={styles.card}>
-          <h3>Günlük Realized PnL</h3>
-          <p style={styles.kpi}>
-            {pnlSummary
-              ? `${numberFormatter.format(pnlSummary.daily_realized_pnl)} USDT`
-              : "-"}
-          </p>
-        </div>
-
-        <div style={styles.card}>
-          <h3>Toplam Realized PnL</h3>
-          <p style={styles.kpi}>
-            {pnlSummary
-              ? `${numberFormatter.format(pnlSummary.total_realized_pnl)} USDT`
-              : "-"}
-          </p>
-        </div>
-
-        <div style={styles.card}>
-          <h3>Genel ROI</h3>
-          <p style={styles.kpi}>
-            {pnlSummary
-              ? `${numberFormatter.format(pnlSummary.overall_roi)} %`
-              : "-"}
-          </p>
-        </div>
-      </section>
-
-      <section style={styles.tableSection}>
-        <div style={styles.tableHeader}>
-          <h2>Açık Pozisyonlar</h2>
-          <span>{positions.length} kayıt</span>
-        </div>
-        <div style={styles.tableWrapper}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th>Sembol</th>
-                <th>Yön</th>
-                <th>Giriş</th>
-                <th>Adet</th>
-                <th>SL Fiyat</th>
-                <th>SL ROE</th>
-                <th>Peak ROE</th>
-                <th>Peak PnL</th>
-              </tr>
-            </thead>
-            <tbody>
-              {positions.length === 0 && (
-                <tr>
-                  <td colSpan={8} style={styles.emptyCell}>
-                    Açık pozisyon yok
-                  </td>
-                </tr>
-              )}
-              {positions.map((pos) => (
-                <tr key={`${pos.symbol}-${pos.position_side}`}>
-                  <td>{pos.symbol}</td>
-                  <td>
-                    <span
-                      style={
-                        pos.position_side === "LONG"
-                          ? styles.badgeSuccess
-                          : styles.badgeDanger
-                      }
-                    >
-                      {pos.position_side}
-                    </span>
-                  </td>
-                  <td>{numberFormatter.format(pos.entry_price || 0)}</td>
-                  <td>{numberFormatter.format(pos.quantity || 0)}</td>
-                  <td>
-                    {pos.stop_loss_price
-                      ? numberFormatter.format(pos.stop_loss_price)
-                      : "-"}
-                  </td>
-                  <td>
-                    {pos.stop_loss_roe
-                      ? `${numberFormatter.format(pos.stop_loss_roe)} %`
-                      : "-"}
-                  </td>
-                  <td>
-                    {pos.peak_roe
-                      ? `${numberFormatter.format(pos.peak_roe)} %`
-                      : "-"}
-                  </td>
-                  <td>
-                    {pos.peak_pnl
-                      ? `${numberFormatter.format(pos.peak_pnl)} USDT`
-                      : "-"}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </main>
+    <Dashboard
+      user={user}
+      dashboardData={dashboardData}
+      positions={positions}
+      onLogout={handleLogout}
+      onClosePosition={handleClosePosition}
+      loading={actionLoading}
+    />
   );
 }
-
-const styles = {
-  container: {
-    minHeight: "100vh",
-    padding: "2rem",
-    backgroundColor: "#0b0f1a",
-    color: "#f1f5f9",
-    fontFamily: "'Inter', system-ui, sans-serif",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: "1.5rem",
-  },
-  title: {
-    fontSize: "2rem",
-    margin: 0,
-  },
-  subtitle: {
-    margin: 0,
-    color: "#94a3b8",
-  },
-  refreshButton: {
-    backgroundColor: "#f3ba2f",
-    color: "#0f172a",
-    border: "none",
-    borderRadius: "999px",
-    padding: "0.6rem 1.4rem",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  error: {
-    color: "#f87171",
-    marginTop: "0.5rem",
-    marginBottom: "1rem",
-  },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "1rem",
-    marginBottom: "2rem",
-  },
-  card: {
-    backgroundColor: "#161b2b",
-    borderRadius: "1rem",
-    padding: "1rem",
-    border: "1px solid rgba(255,255,255,0.05)",
-  },
-  kpi: {
-    fontSize: "1.8rem",
-    fontWeight: 700,
-    margin: "0.5rem 0 0",
-  },
-  badgeSuccess: {
-    display: "inline-block",
-    padding: "0.2rem 0.6rem",
-    borderRadius: "999px",
-    backgroundColor: "rgba(34,197,94,0.15)",
-    color: "#22c55e",
-    fontWeight: 600,
-  },
-  badgeDanger: {
-    display: "inline-block",
-    padding: "0.2rem 0.6rem",
-    borderRadius: "999px",
-    backgroundColor: "rgba(239,68,68,0.15)",
-    color: "#ef4444",
-    fontWeight: 600,
-  },
-  tableSection: {
-    backgroundColor: "#111425",
-    borderRadius: "1.5rem",
-    padding: "1.5rem",
-    border: "1px solid rgba(255,255,255,0.08)",
-  },
-  tableHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    marginBottom: "1rem",
-    alignItems: "center",
-  },
-  tableWrapper: {
-    overflowX: "auto",
-  },
-  table: {
-    width: "100%",
-    borderCollapse: "collapse",
-  },
-  emptyCell: {
-    textAlign: "center",
-    padding: "1.5rem",
-    color: "#94a3b8",
-  },
-  authWrapper: {
-    width: "100%",
-    display: "flex",
-    justifyContent: "center",
-    alignItems: "center",
-    minHeight: "60vh",
-  },
-  authCard: {
-    width: "100%",
-    maxWidth: "420px",
-    backgroundColor: "#111425",
-    borderRadius: "1.5rem",
-    padding: "2rem",
-    border: "1px solid rgba(255,255,255,0.08)",
-    boxShadow: "0 20px 60px rgba(0,0,0,0.35)",
-  },
-  authTitle: {
-    margin: "0 0 0.5rem",
-    fontSize: "1.8rem",
-  },
-  authForm: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "1rem",
-    marginTop: "1.5rem",
-  },
-  authLabel: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "0.4rem",
-    fontSize: "0.9rem",
-  },
-  authInput: {
-    borderRadius: "0.8rem",
-    border: "1px solid rgba(255,255,255,0.1)",
-    padding: "0.75rem 1rem",
-    backgroundColor: "#0f1320",
-    color: "#f1f5f9",
-  },
-  primaryButton: {
-    backgroundColor: "#f3ba2f",
-    color: "#0f172a",
-    border: "none",
-    borderRadius: "999px",
-    padding: "0.8rem 1.4rem",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-  userBox: {
-    display: "flex",
-    alignItems: "center",
-    gap: "1rem",
-  },
-  userName: {
-    margin: 0,
-    fontWeight: 600,
-  },
-  userRole: {
-    color: "#94a3b8",
-  },
-  logoutButton: {
-    backgroundColor: "transparent",
-    color: "#f87171",
-    border: "1px solid rgba(248,113,113,0.4)",
-    borderRadius: "999px",
-    padding: "0.5rem 1.2rem",
-    fontWeight: 600,
-    cursor: "pointer",
-  },
-};
 
