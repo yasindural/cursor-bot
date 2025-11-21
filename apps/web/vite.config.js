@@ -3,6 +3,7 @@ const react = require("@vitejs/plugin-react");
 const path = require("path");
 
 module.exports = defineConfig({
+  base: "/cursor-bot/",          // 🔹 BU SATIRI EKLE
   plugins: [react()],
   resolve: {
     alias: {
@@ -13,4 +14,3 @@ module.exports = defineConfig({
     port: 5173,
   },
 });
-
