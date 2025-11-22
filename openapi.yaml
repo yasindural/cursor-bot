@@ -1,0 +1,82 @@
+﻿openapi: 3.1.0
+info:
+  title: Cursor Futures Bot Panel API
+  version: 1.0.0
+servers:
+  - url: https://cursor-futures-bot-panel.onrender.com
+paths:
+  /api/status:
+    get:
+      summary: Sunucu durumunu döner
+      operationId: getStatus
+      responses:
+        "200":
+          description: Başarılı
+  /api/open-positions:
+    get:
+      summary: Açık pozisyonları getirir
+      operationId: getOpenPositions
+      responses:
+        "200":
+          description: Liste döner
+  /api/pnl/summary:
+    get:
+      summary: Kar/Zarar özetini döner
+      operationId: getPnlSummary
+      responses:
+        "200":
+          description: Başarılı
+  /api/smoke-test:
+    get:
+      summary: Test endpoint
+      operationId: smokeTest
+      responses:
+        "200":
+          description: OK
+  /api/auth/login:
+    post:
+      summary: Kullanıcı girişi
+      operationId: loginUser
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Başarılı giriş
+  /api/auth/me:
+    get:
+      summary: Aktif kullanıcıyı döner
+      operationId: getCurrentUser
+      responses:
+        "200":
+          description: Kullanıcı bilgisi
+  /api/auth/logout:
+    post:
+      summary: Oturum kapatma
+      operationId: logoutUser
+      responses:
+        "200":
+          description: Çıkış başarılı
+components:
+  schemas: {}
+  securitySchemes:
+    OAuth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: https://cursor-futures-bot-panel.onrender.com/api/auth/authorize
+          tokenUrl: https://cursor-futures-bot-panel.onrender.com/api/auth/token
+          scopes:
+            openid: OpenID Connect erişimi
+            profile: Kullanıcı profili
+            email: Kullanıcı e-postası
+security:
+  - OAuth2: [openid, profile, email]
