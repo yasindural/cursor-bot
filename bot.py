@@ -1,4 +1,3 @@
-Set-Content "C:\Users\gaming\Desktop\CURSOR İLE BOT\bot.py" @"
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from decimal import Decimal
@@ -70,12 +69,8 @@ def webhook():
     qty = 0.001  # Test miktar (USDT bazlı coinlerde küçük tut)
     print(f"[ALARM] {ticker} {direction} entry={entry}")
     res = place_market_order(ticker, side, qty)
-
     return jsonify({"status": "order_sent", "symbol": ticker, "side": side, "result": res})
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
-"@
 
 # === Take Profit (%10 ROI) Takip Sistemi ===
 def watch_for_take_profit(symbol, position_side, leverage, entry_price):
@@ -85,7 +80,7 @@ def watch_for_take_profit(symbol, position_side, leverage, entry_price):
             pos = get_position_risk(symbol, position_side)
             amt = Decimal(pos.get("positionAmt", "0"))
             if amt == 0:
-                print(f"[TP] {symbol}:{position_side} kapand�")
+                print(f"[TP] {symbol}:{position_side} kapandı")
                 return
 
             mark_price = _decimal(pos.get("markPrice", get_price(symbol)))
@@ -95,7 +90,7 @@ def watch_for_take_profit(symbol, position_side, leverage, entry_price):
             roi = (pnl / margin) * 100 if margin > 0 else Decimal("0")
 
             if roi >= 10:
-                print(f"[TP HIT] {symbol}:{position_side} ROI={roi:.2f}% � Pozisyon kapat�l�yor")
+                print(f"[TP HIT] {symbol}:{position_side} ROI={roi:.2f}% — Pozisyon kapatılıyor")
                 _close_position_market(symbol, position_side, abs(amt))
                 return
 
@@ -103,3 +98,7 @@ def watch_for_take_profit(symbol, position_side, leverage, entry_price):
             print(f"[TP ERROR] {symbol}:{position_side} {e}")
 
         time.sleep(WATCH_INTERVAL_SECONDS)
+
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
