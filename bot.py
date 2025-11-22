@@ -1,45 +1,51 @@
+Set-Content "C:\Users\gaming\Desktop\CURSOR İLE BOT\bot.py" @"
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from decimal import Decimal
-import threading, time, os, requests
+import threading, time, os, requests, hmac, hashlib
+from urllib.parse import urlencode
 
-# === Uygulama Başlatma ===
+# === Flask Uygulaması ===
 app = Flask(__name__)
 CORS(app)
 
-# === Dinamik Ayarlar (Panelde değiştirilebilir) ===
-config = {
-    "SL_PERCENT": -20,
-    "TP_PERCENT": 30,
-    "FAST_EMA": 9,
-    "SLOW_EMA": 21,
-    "RSI_LEN": 14,
-    "ADX_LEN": 14,
-    "MACD_FAST": 12,
-    "MACD_SLOW": 26,
-    "MACD_SIGNAL": 9,
-}
-
-# === Binance API Bilgileri ===
-BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
-BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+BINANCE_API_KEY = os.getenv("BINANCE_API_KEY")
+BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET")
 BASE_URL = "https://fapi.binance.com"
 
 session = requests.Session()
-if BINANCE_API_KEY:
-    session.headers.update({"X-MBX-APIKEY": BINANCE_API_KEY})
+session.headers.update({"X-MBX-APIKEY": BINANCE_API_KEY})
 
-# === Basit Pozisyon Takip Sistemi ===
-open_positions = {}
-lock = threading.Lock()
+config = {
+    "SL_PERCENT": -20,
+    "TP_PERCENT": 30
+}
 
+# === Binance Signature ===
+def _sign(params):
+    query = urlencode(params)
+    signature = hmac.new(BINANCE_API_SECRET.encode(), query.encode(), hashlib.sha256).hexdigest()
+    params["signature"] = signature
+    return params
+
+# === Market Order Gönder ===
+def place_market_order(symbol, side, quantity):
+    params = {
+        "symbol": symbol,
+        "side": side,
+        "type": "MARKET",
+        "quantity": quantity,
+        "timestamp": int(time.time() * 1000)
+    }
+    signed = _sign(params)
+    r = session.post(f"{BASE_URL}/fapi/v1/order", params=signed)
+    print("[ORDER]", r.status_code, r.text)
+    return r.json()
 
 @app.route("/")
 def home():
     return jsonify({"status": "Backend live 🚀", "config": config})
 
-
-# === Ayar Güncelleme ===
 @app.route("/api/config", methods=["GET", "POST"])
 def update_config():
     global config
@@ -47,15 +53,10 @@ def update_config():
         data = request.get_json(force=True) or {}
         for key in config.keys():
             if key in data:
-                try:
-                    config[key] = float(data[key])
-                except:
-                    config[key] = data[key]
+                config[key] = float(data[key])
         return jsonify({"status": "ok", "config": config})
     return jsonify(config)
 
-
-# === TradingView Webhook ===
 @app.route("/webhook", methods=["POST"])
 def webhook():
     data = request.get_json(force=True, silent=True) or {}
@@ -65,26 +66,40 @@ def webhook():
     if not ticker or direction not in ("LONG", "SHORT"):
         return jsonify({"error": "invalid payload", "data": data}), 400
 
-    with lock:
-        open_positions[ticker] = {
-            "symbol": ticker,
-            "direction": direction,
-            "entry": float(entry),
-            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "sl_percent": config["SL_PERCENT"],
-            "tp_percent": config["TP_PERCENT"]
-        }
+    side = "BUY" if direction == "LONG" else "SELL"
+    qty = 0.001  # Test miktar (USDT bazlı coinlerde küçük tut)
+    print(f"[ALARM] {ticker} {direction} entry={entry}")
+    res = place_market_order(ticker, side, qty)
 
-    print(f"[SIGNAL] {ticker} {direction} {entry} SL={config['SL_PERCENT']} TP={config['TP_PERCENT']}")
-    return jsonify({"status": "ok", "symbol": ticker, "direction": direction, "entry": float(entry)})
-
-
-# === Basit Pozisyon Görüntüleme ===
-@app.route("/api/open-positions")
-def positions():
-    with lock:
-        return jsonify(open_positions)
-
+    return jsonify({"status": "order_sent", "symbol": ticker, "side": side, "result": res})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+"@
+
+# === Take Profit (%10 ROI) Takip Sistemi ===
+def watch_for_take_profit(symbol, position_side, leverage, entry_price):
+    time.sleep(3)
+    while True:
+        try:
+            pos = get_position_risk(symbol, position_side)
+            amt = Decimal(pos.get("positionAmt", "0"))
+            if amt == 0:
+                print(f"[TP] {symbol}:{position_side} kapand�")
+                return
+
+            mark_price = _decimal(pos.get("markPrice", get_price(symbol)))
+            direction = 1 if position_side.upper() == "LONG" else -1
+            pnl = (mark_price - entry_price) * direction * abs(amt)
+            margin = (entry_price * abs(amt)) / leverage
+            roi = (pnl / margin) * 100 if margin > 0 else Decimal("0")
+
+            if roi >= 10:
+                print(f"[TP HIT] {symbol}:{position_side} ROI={roi:.2f}% � Pozisyon kapat�l�yor")
+                _close_position_market(symbol, position_side, abs(amt))
+                return
+
+        except Exception as e:
+            print(f"[TP ERROR] {symbol}:{position_side} {e}")
+
+        time.sleep(WATCH_INTERVAL_SECONDS)
