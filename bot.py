@@ -20,6 +20,8 @@ config = {
     "TP_PERCENT": 30
 }
 
+open_positions = {}  # eklendi
+
 # === Binance Signature ===
 def _sign(params):
     query = urlencode(params)
@@ -66,11 +68,11 @@ def webhook():
         return jsonify({"error": "invalid payload", "data": data}), 400
 
     side = "BUY" if direction == "LONG" else "SELL"
-    qty = 0.001  # Test miktar (USDT bazlı coinlerde küçük tut)
+    qty = 0.001  # Test miktar
     print(f"[ALARM] {ticker} {direction} entry={entry}")
     res = place_market_order(ticker, side, qty)
+    open_positions[ticker] = {"symbol": ticker, "direction": direction, "entry": float(entry), "result": res}
     return jsonify({"status": "order_sent", "symbol": ticker, "side": side, "result": res})
-
 
 # === Take Profit (%10 ROI) Takip Sistemi ===
 def watch_for_take_profit(symbol, position_side, leverage, entry_price):
@@ -82,26 +84,18 @@ def watch_for_take_profit(symbol, position_side, leverage, entry_price):
             if amt == 0:
                 print(f"[TP] {symbol}:{position_side} kapandı")
                 return
-
             mark_price = _decimal(pos.get("markPrice", get_price(symbol)))
             direction = 1 if position_side.upper() == "LONG" else -1
             pnl = (mark_price - entry_price) * direction * abs(amt)
             margin = (entry_price * abs(amt)) / leverage
             roi = (pnl / margin) * 100 if margin > 0 else Decimal("0")
-
             if roi >= 10:
                 print(f"[TP HIT] {symbol}:{position_side} ROI={roi:.2f}% — Pozisyon kapatılıyor")
                 _close_position_market(symbol, position_side, abs(amt))
                 return
-
         except Exception as e:
             print(f"[TP ERROR] {symbol}:{position_side} {e}")
-
-        time.sleep(WATCH_INTERVAL_SECONDS)
-
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+        time.sleep(3)
 
 # === Status ve Open Positions Endpointleri ===
 @app.route("/api/status", methods=["GET"])
@@ -109,13 +103,12 @@ def api_status():
     uptime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
     last_signal = open_positions[list(open_positions.keys())[-1]] if open_positions else {}
     return jsonify({
-        "status": "Backend live ??",
+        "status": "Backend live 🚀",
         "open_positions_count": len(open_positions),
         "last_signal": last_signal,
         "uptime": uptime,
         "config": config
     })
-
 
 @app.route("/api/open-positions", methods=["GET"])
 def api_open_positions():
@@ -123,3 +116,6 @@ def api_open_positions():
         "count": len(open_positions),
         "positions": open_positions
     })
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=10000)
