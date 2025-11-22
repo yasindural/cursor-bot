@@ -3,11 +3,11 @@ from flask_cors import CORS
 from decimal import Decimal
 import threading, time, os, requests
 
-# === Uygulama Baþlatma ===
+# === Uygulama BaÅŸlatma ===
 app = Flask(__name__)
 CORS(app)
 
-# === Dinamik Ayarlar (Panelde deðiþtirilebilir) ===
+# === Dinamik Ayarlar (Panelde deÄŸiÅŸtirilebilir) ===
 config = {
     "SL_PERCENT": -20,
     "TP_PERCENT": 30,
@@ -33,11 +33,13 @@ if BINANCE_API_KEY:
 open_positions = {}
 lock = threading.Lock()
 
+
 @app.route("/")
 def home():
-    return jsonify({"status": "Backend live ?", "config": config})
+    return jsonify({"status": "Backend live ðŸš€", "config": config})
 
-# === Ayar Güncelleme ===
+
+# === Ayar GÃ¼ncelleme ===
 @app.route("/api/config", methods=["GET", "POST"])
 def update_config():
     global config
@@ -51,6 +53,7 @@ def update_config():
                     config[key] = data[key]
         return jsonify({"status": "ok", "config": config})
     return jsonify(config)
+
 
 # === TradingView Webhook ===
 @app.route("/webhook", methods=["POST"])
@@ -75,11 +78,13 @@ def webhook():
     print(f"[SIGNAL] {ticker} {direction} {entry} SL={config['SL_PERCENT']} TP={config['TP_PERCENT']}")
     return jsonify({"status": "ok", "symbol": ticker, "direction": direction, "entry": float(entry)})
 
-# === Basit Pozisyon Görüntüleme ===
+
+# === Basit Pozisyon GÃ¶rÃ¼ntÃ¼leme ===
 @app.route("/api/open-positions")
 def positions():
     with lock:
         return jsonify(open_positions)
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
