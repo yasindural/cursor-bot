@@ -102,3 +102,24 @@ def watch_for_take_profit(symbol, position_side, leverage, entry_price):
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=10000)
+
+# === Status ve Open Positions Endpointleri ===
+@app.route("/api/status", methods=["GET"])
+def api_status():
+    uptime = time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(os.path.getmtime(__file__)))
+    last_signal = open_positions[list(open_positions.keys())[-1]] if open_positions else {}
+    return jsonify({
+        "status": "Backend live ??",
+        "open_positions_count": len(open_positions),
+        "last_signal": last_signal,
+        "uptime": uptime,
+        "config": config
+    })
+
+
+@app.route("/api/open-positions", methods=["GET"])
+def api_open_positions():
+    return jsonify({
+        "count": len(open_positions),
+        "positions": open_positions
+    })
