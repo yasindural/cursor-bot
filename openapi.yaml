@@ -1,7 +1,7 @@
 ﻿openapi: 3.1.0
 info:
   title: Cursor Futures Bot Panel API
-  version: 1.0.0
+  version: 2.0.0
 servers:
   - url: https://cursor-futures-bot-panel.onrender.com
 paths:
@@ -35,7 +35,7 @@ paths:
           description: OK
   /api/auth/login:
     post:
-      summary: Kullanıcı girişi
+      summary: Kullanıcı girişi (admin)
       operationId: loginUser
       requestBody:
         required: true
@@ -46,18 +46,13 @@ paths:
               properties:
                 username:
                   type: string
+                  example: admin
                 password:
                   type: string
+                  example: YeniSifre123
       responses:
         "200":
           description: Başarılı giriş
-  /api/auth/me:
-    get:
-      summary: Aktif kullanıcıyı döner
-      operationId: getCurrentUser
-      responses:
-        "200":
-          description: Kullanıcı bilgisi
   /api/auth/logout:
     post:
       summary: Oturum kapatma
@@ -67,14 +62,3 @@ paths:
           description: Çıkış başarılı
 components:
   schemas: {}
-  securitySchemes:
-    OAuth2:
-      type: oauth2
-      flows:
-        authorizationCode:
-          authorizationUrl: https://cursor-futures-bot-panel.onrender.com/api/auth/authorize
-          tokenUrl: https://cursor-futures-bot-panel.onrender.com/api/auth/token
-          scopes:
-            openid: Test erişimi
-security:
-  - OAuth2: [openid]
